@@ -528,6 +528,24 @@ void Sensors::InitializeVehicleIMU()
 	for (uint8_t i = 0; i < MAX_SENSOR_COUNT; i++) {
 		if (_vehicle_imu_list[i] == nullptr) {
 
+			bool accel_fifo = false;
+			bool gyro_fifo = false;
+
+			uORB::SubscriptionData<sensor_accel_s> sensor_accel_sub{ORB_ID::sensor_accel, i};
+			uORB::SubscriptionData<sensor_accel_fifo_s> sensor_accel_fifo_sub{ORB_ID::sensor_accel_fifo, i};
+
+			// prefer FIFO if available
+			if (sensor_accel_fifo_sub.get().device_id != 0) {
+				accel_fifo = true;
+
+			} else if (sensor_accel_sub.get().device_id != 0) {
+				accel_fifo = false;
+			}
+
+			uORB::SubscriptionData<sensor_gyro_s> sensor_gyro_sub{ORB_ID::sensor_gyro, i};
+			uORB::SubscriptionData<sensor_gyro_fifo_s> sensor_gyro_fifo_sub{ORB_ID::sensor_gyro_fifo, i};
+
+
 			uORB::Subscription accel_sub{ORB_ID(sensor_accel), i};
 			sensor_accel_s accel{};
 			accel_sub.copy(&accel);
@@ -542,7 +560,7 @@ void Sensors::InitializeVehicleIMU()
 				const bool multi_mode = (_param_sens_imu_mode.get() == 0);
 				const px4::wq_config_t &wq_config = multi_mode ? px4::ins_instance_to_wq(i) : px4::wq_configurations::INS0;
 
-				VehicleIMU *imu = new VehicleIMU(i, i, i, wq_config);
+				VehicleIMU *imu = new VehicleIMU(i, accel_fifo, accel.device_id, gyro_fifo, gyro.device_id, wq_config);
 
 				if (imu != nullptr) {
 					// Start VehicleIMU instance and store

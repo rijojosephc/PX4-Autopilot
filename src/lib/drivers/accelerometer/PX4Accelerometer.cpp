@@ -165,9 +165,9 @@ void PX4Accelerometer::Publish(const hrt_abstime &timestamp_sample, float x, flo
 	report.x = x * _scale;
 	report.y = y * _scale;
 	report.z = z * _scale;
-	report.clip_counter[0] = fabsf(roundf(clipping_x));
-	report.clip_counter[1] = fabsf(roundf(clipping_y));
-	report.clip_counter[2] = fabsf(roundf(clipping_z));
+	// report.clip_counter[0] = fabsf(roundf(clipping_x));
+	// report.clip_counter[1] = fabsf(roundf(clipping_y));
+	// report.clip_counter[2] = fabsf(roundf(clipping_z));
 	report.timestamp = hrt_absolute_time();
 
 	_sensor_pub.publish(report);

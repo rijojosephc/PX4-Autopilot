@@ -144,6 +144,7 @@
 #include <uORB/SubscriptionBlocking.hpp>
 #include <uORB/SubscriptionMultiArray.hpp>
 #include <uORB/topics/sensor_accel.h>
+#include <uORB/topics/sensor_accel_fifo.h>
 #include <uORB/topics/vehicle_attitude.h>
 
 using namespace matrix;
@@ -172,6 +173,13 @@ static calibrate_return read_accelerometer_avg(float (&accel_avg)[MAX_ACCEL_SENS
 	uORB::Subscription sensor_correction_sub{ORB_ID(sensor_correction)};
 	sensor_correction_s sensor_correction{};
 	sensor_correction_sub.copy(&sensor_correction);
+
+	uORB::SubscriptionBlocking<sensor_accel_fifo_s> accel_fifo_sub[MAX_ACCEL_SENS] {
+		{ORB_ID(sensor_accel_fifo), 0, 0},
+		{ORB_ID(sensor_accel_fifo), 0, 1},
+		{ORB_ID(sensor_accel_fifo), 0, 2},
+		{ORB_ID(sensor_accel_fifo), 0, 3},
+	};
 
 	uORB::SubscriptionBlocking<sensor_accel_s> accel_sub[MAX_ACCEL_SENS] {
 		{ORB_ID(sensor_accel), 0, 0},
@@ -329,6 +337,7 @@ int do_accel_calibration(orb_advert_t *mavlink_log_pub)
 
 	for (uint8_t cur_accel = 0; cur_accel < MAX_ACCEL_SENS; cur_accel++) {
 		uORB::SubscriptionData<sensor_accel_s> accel_sub{ORB_ID(sensor_accel), cur_accel};
+		uORB::SubscriptionData<sensor_accel_fifo_s> accel_fifo_sub{ORB_ID(sensor_accel_fifo), cur_accel};
 
 		if (accel_sub.advertised() && (accel_sub.get().device_id != 0) && (accel_sub.get().timestamp > 0)) {
 			calibrations[cur_accel].set_device_id(accel_sub.get().device_id);

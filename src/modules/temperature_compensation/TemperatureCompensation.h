@@ -49,13 +49,10 @@
 namespace temperature_compensation
 {
 
-static constexpr uint8_t GYRO_COUNT_MAX = 4;
-static constexpr uint8_t ACCEL_COUNT_MAX = 4;
+static constexpr uint8_t IMU_COUNT_MAX = 4;
 static constexpr uint8_t BARO_COUNT_MAX = 4;
 
-static_assert(GYRO_COUNT_MAX == 4, "GYRO_COUNT_MAX must be 4 (if changed, add/remove TC_* params to match the count)");
-static_assert(ACCEL_COUNT_MAX == 4,
-	      "ACCEL_COUNT_MAX must be 4 (if changed, add/remove TC_* params to match the count)");
+static_assert(IMU_COUNT_MAX == 4, "IMU_COUNT_MAX must be 4 (if changed, add/remove TC_* params to match the count)");
 static_assert(BARO_COUNT_MAX == 4, "BARO_COUNT_MAX must be 4 (if changed, add/remove TC_* params to match the count)");
 
 static constexpr uint8_t SENSOR_COUNT_MAX = 4;
@@ -179,10 +176,10 @@ private:
 	// create a struct containing all thermal calibration parameters
 	struct Parameters {
 		int32_t gyro_tc_enable{0};
-		SensorCalData3D gyro_cal_data[GYRO_COUNT_MAX] {};
+		SensorCalData3D gyro_cal_data[IMU_COUNT_MAX] {};
 
 		int32_t accel_tc_enable{0};
-		SensorCalData3D accel_cal_data[ACCEL_COUNT_MAX] {};
+		SensorCalData3D accel_cal_data[IMU_COUNT_MAX] {};
 
 		int32_t baro_tc_enable{0};
 		SensorCalData1D baro_cal_data[BARO_COUNT_MAX] {};
@@ -191,10 +188,10 @@ private:
 	// create a struct containing the handles required to access all calibration parameters
 	struct ParameterHandles {
 		param_t gyro_tc_enable{PARAM_INVALID};
-		SensorCalHandles3D gyro_cal_handles[GYRO_COUNT_MAX] {};
+		SensorCalHandles3D gyro_cal_handles[IMU_COUNT_MAX] {};
 
 		param_t accel_tc_enable{PARAM_INVALID};
-		SensorCalHandles3D accel_cal_handles[ACCEL_COUNT_MAX] {};
+		SensorCalHandles3D accel_cal_handles[IMU_COUNT_MAX] {};
 
 		param_t baro_tc_enable{PARAM_INVALID};
 		SensorCalHandles1D baro_cal_handles[BARO_COUNT_MAX] {};

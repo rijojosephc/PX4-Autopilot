@@ -49,7 +49,9 @@
 #include <uORB/SubscriptionCallback.hpp>
 #include <uORB/topics/parameter_update.h>
 #include <uORB/topics/sensor_accel.h>
+#include <uORB/topics/sensor_accel_fifo.h>
 #include <uORB/topics/sensor_gyro.h>
+#include <uORB/topics/sensor_gyro_fifo.h>
 #include <uORB/topics/vehicle_imu.h>
 #include <uORB/topics/vehicle_imu_status.h>
 
@@ -60,7 +62,8 @@ class VehicleIMU : public ModuleParams, public px4::ScheduledWorkItem
 {
 public:
 	VehicleIMU() = delete;
-	VehicleIMU(int instance, uint8_t accel_index, uint8_t gyro_index, const px4::wq_config_t &config);
+	VehicleIMU(int instance, bool accel_fifo, uint8_t accel_index, bool gyro_fifo, uint8_t gyro_index,
+		   const px4::wq_config_t &config);
 
 	~VehicleIMU() override;
 
@@ -71,6 +74,7 @@ public:
 
 private:
 	void ParametersUpdate(bool force = false);
+	void Publish();
 	void Run() override;
 
 	struct IntervalAverage {
@@ -80,10 +84,15 @@ private:
 		float update_interval{0.f};
 	};
 
-	bool UpdateIntervalAverage(IntervalAverage &intavg, const hrt_abstime &timestamp_sample);
+	bool UpdateIntervalAverage(IntervalAverage &intavg, const hrt_abstime &timestamp_sample, uint8_t samples = 1);
 	void UpdateIntegratorConfiguration();
 	void UpdateGyroVibrationMetrics(const matrix::Vector3f &delta_angle);
 	void UpdateAccelVibrationMetrics(const matrix::Vector3f &delta_velocity);
+
+	void UpdateAccel();
+	void UpdateAccelFifo();
+	void UpdateGyro();
+	void UpdateGyroFifo();
 
 	uORB::PublicationMulti<vehicle_imu_s> _vehicle_imu_pub{ORB_ID(vehicle_imu)};
 	uORB::PublicationMulti<vehicle_imu_status_s> _vehicle_imu_status_pub{ORB_ID(vehicle_imu_status)};
@@ -91,33 +100,61 @@ private:
 	uORB::SubscriptionCallbackWorkItem _sensor_accel_sub;
 	uORB::SubscriptionCallbackWorkItem _sensor_gyro_sub;
 
+	struct Sensor {
+		hrt_abstime last_timestamp_sample{0};
+
+		IntervalAverage interval{};
+
+		unsigned last_generation{0};
+
+		matrix::Vector3f data_sum{};
+		int sum_count{0};
+		int temperature_sum_count{0};
+		float temperature_sum{0};
+
+		// integration
+		uint8_t integrated_samples{0};
+
+		matrix::Vector3f integrated_data{};
+
+		matrix::Vector3f last_sample{};
+		int16_t last_sample_fifo[3] {};
+
+		float integrated_time_us{};
+
+		uint8_t integrated_samples_min{1};
+		uint32_t reset_interval_min{1};
+
+		bool fifo{false};
+
+		bool integrator_reset(matrix::Vector3f &integral, uint32_t &integral_dt)
+		{
+			integral.zero();
+			integral_dt = 0;
+			return true;
+		}
+
+		bool integral_ready() const { return (integrated_samples > 0); }
+
+		// bool integral_ready() const { return (_integrated_samples >= _reset_samples_min) || (_last_integration_time >= (_last_reset_time + _reset_interval_min)); }
+	};
+
+	Sensor _accel;
+	Sensor _gyro;
+
+	Integrator _gyro_integrator{true};
+
 	calibration::Accelerometer _accel_calibration{};
 	calibration::Gyroscope _gyro_calibration{};
 
-	Integrator _accel_integrator{}; // 200 Hz default
-	Integrator _gyro_integrator{true};   // 200 Hz default, coning compensation enabled
-
-	hrt_abstime _last_timestamp_sample_accel{0};
-	hrt_abstime _last_timestamp_sample_gyro{0};
+	matrix::Vector3f _delta_velocity_prev{};
+	matrix::Vector3f _delta_angle_prev{};
 
 	uint32_t _imu_integration_interval_us{4000};
 
-	IntervalAverage _accel_interval{};
-	IntervalAverage _gyro_interval{};
-
-	unsigned _accel_last_generation{0};
-	unsigned _gyro_last_generation{0};
 	unsigned _consecutive_data_gap{0};
 
-	matrix::Vector3f _accel_sum{};
-	matrix::Vector3f _gyro_sum{};
-	int _accel_sum_count{0};
-	int _gyro_sum_count{0};
-	float _accel_temperature{0};
-	float _gyro_temperature{0};
-
-	matrix::Vector3f _delta_angle_prev{0.f, 0.f, 0.f};	// delta angle from the previous IMU measurement
-	matrix::Vector3f _delta_velocity_prev{0.f, 0.f, 0.f};	// delta velocity from the previous IMU measurement
+	int _accel_gyro_sum_count{0};
 
 	vehicle_imu_status_s _status{};
 
@@ -125,7 +162,16 @@ private:
 
 	bool _intervals_configured{false};
 
+	bool _update_integrator_config{false};
+	bool _publish_status{false};
+	bool _sensor_data_gap{false};
+
 	const uint8_t _instance;
+
+	// gyro coning corrections
+	matrix::Vector3f _gyro_last_alpha{};       // gyro previous value of alpha
+	matrix::Vector3f _gyro_beta{};             // accumulated gyro coning corrections
+	matrix::Vector3f _gyro_last_delta_alpha{}; // gyro integral from previous previous sampling interval
 
 	perf_counter_t _accel_update_perf{perf_alloc(PC_INTERVAL, MODULE_NAME": accel update interval")};
 	perf_counter_t _accel_generation_gap_perf{perf_alloc(PC_COUNT, MODULE_NAME": accel data gap")};

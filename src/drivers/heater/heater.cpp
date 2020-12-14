@@ -90,10 +90,10 @@ void Heater::Run()
 	} else {
 		update_params(false);
 
-		_sensor_accel_sub.update(&_sensor_accel);
+		_vehicle_imu_status_sub.update(&_vehicle_imu_status);
 
 		// Obtain the current IMU sensor temperature.
-		_sensor_temperature = _sensor_accel.temperature;
+		_sensor_temperature = _vehicle_imu_status.temperature_accel;
 
 		// Calculate the temperature delta between the setpoint and reported temperature.
 		float temperature_delta = _param_sens_imu_temp.get() - _sensor_temperature;
@@ -130,26 +130,26 @@ void Heater::Run()
 void Heater::initialize_topics()
 {
 	// Get the total number of accelerometer instances.
-	uint8_t number_of_imus = orb_group_count(ORB_ID(sensor_accel));
+	uint8_t number_of_imus = orb_group_count(ORB_ID(vehicle_imu_status));
 
 	// Check each instance for the correct ID.
 	for (uint8_t x = 0; x < number_of_imus; x++) {
-		_sensor_accel_sub = uORB::Subscription{ORB_ID(sensor_accel), x};
+		_vehicle_imu_status_sub = uORB::Subscription{ORB_ID(vehicle_imu_status), x};
 
-		if (!_sensor_accel_sub.advertised()) {
+		if (!_vehicle_imu_status_sub.advertised()) {
 			continue;
 		}
 
-		_sensor_accel_sub.copy(&_sensor_accel);
+		_vehicle_imu_status_sub.copy(&_vehicle_imu_status);
 
-		// If the correct ID is found, exit the for-loop with _sensor_accel_sub pointing to the correct instance.
-		if (_sensor_accel.device_id == (uint32_t)_param_sens_temp_id.get()) {
+		// If the correct ID is found, exit the for-loop with _vehicle_imu_status_sub pointing to the correct instance.
+		if (_vehicle_imu_status.accel_device_id == (uint32_t)_param_sens_temp_id.get()) {
 			break;
 		}
 	}
 
 	// Exit the driver if the sensor ID does not match the desired sensor.
-	if (_sensor_accel.device_id != (uint32_t)_param_sens_temp_id.get()) {
+	if (_vehicle_imu_status.accel_device_id != (uint32_t)_param_sens_temp_id.get()) {
 		request_stop();
 		PX4_ERR("Could not identify IMU sensor.");
 	}
@@ -158,7 +158,7 @@ void Heater::initialize_topics()
 int Heater::print_status()
 {
 	PX4_INFO("Sensor ID: %d - Temperature: %3.3fC, Setpoint: %3.2fC, Heater State: %s",
-		 _sensor_accel.device_id,
+		 _vehicle_imu_status.accel_device_id,
 		 (double)_sensor_temperature,
 		 (double)_param_sens_imu_temp.get(),
 		 _heater_on ? "On" : "Off");

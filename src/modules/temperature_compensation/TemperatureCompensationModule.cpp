@@ -59,36 +59,28 @@ void TemperatureCompensationModule::parameters_update()
 {
 	_temperature_compensation.parameters_update();
 
-	// Gyro
-	for (uint8_t uorb_index = 0; uorb_index < GYRO_COUNT_MAX; uorb_index++) {
-		sensor_gyro_s report;
+	// IMU (Accel & Gyro)
+	for (uint8_t uorb_index = 0; uorb_index < IMU_COUNT_MAX; uorb_index++) {
+		vehicle_imu_status_s imu_status;
 
-		if (_gyro_subs[uorb_index].copy(&report)) {
-			int temp = _temperature_compensation.set_sensor_id_gyro(report.device_id, uorb_index);
+		if (_vehicle_imu_status_subs[uorb_index].copy(&imu_status)) {
 
-			if (temp < 0) {
-				PX4_INFO("No temperature calibration available for gyro %i (device id %u)", uorb_index, report.device_id);
-				_corrections.gyro_device_ids[uorb_index] = 0;
-
-			} else {
-				_corrections.gyro_device_ids[uorb_index] = report.device_id;
-			}
-		}
-	}
-
-	// Accel
-	for (uint8_t uorb_index = 0; uorb_index < ACCEL_COUNT_MAX; uorb_index++) {
-		sensor_accel_s report;
-
-		if (_accel_subs[uorb_index].copy(&report)) {
-			int temp = _temperature_compensation.set_sensor_id_accel(report.device_id, uorb_index);
-
-			if (temp < 0) {
-				PX4_INFO("No temperature calibration available for accel %i (device id %u)", uorb_index, report.device_id);
+			// Accel
+			if (_temperature_compensation.set_sensor_id_accel(imu_status.accel_device_id, uorb_index) < 0) {
+				PX4_INFO("No temperature calibration available for accel %i (device id %u)", uorb_index, imu_status.accel_device_id);
 				_corrections.accel_device_ids[uorb_index] = 0;
 
 			} else {
-				_corrections.accel_device_ids[uorb_index] = report.device_id;
+				_corrections.accel_device_ids[uorb_index] = imu_status.accel_device_id;
+			}
+
+			// Gyro
+			if (_temperature_compensation.set_sensor_id_gyro(imu_status.gyro_device_id, uorb_index) < 0) {
+				PX4_INFO("No temperature calibration available for gyro %i (device id %u)", uorb_index, imu_status.gyro_device_id);
+				_corrections.gyro_device_ids[uorb_index] = 0;
+
+			} else {
+				_corrections.gyro_device_ids[uorb_index] = imu_status.gyro_device_id;
 			}
 		}
 	}
@@ -111,43 +103,36 @@ void TemperatureCompensationModule::parameters_update()
 	}
 }
 
-void TemperatureCompensationModule::accelPoll()
+void TemperatureCompensationModule::imuPoll()
 {
-	float *offsets[] = {_corrections.accel_offset_0, _corrections.accel_offset_1, _corrections.accel_offset_2, _corrections.accel_offset_3 };
+	for (uint8_t uorb_index = 0; uorb_index < IMU_COUNT_MAX; uorb_index++) {
 
-	// For each accel instance
-	for (uint8_t uorb_index = 0; uorb_index < ACCEL_COUNT_MAX; uorb_index++) {
-		sensor_accel_s report;
+		vehicle_imu_status_s imu_status{};
 
 		// Grab temperature from report
-		if (_accel_subs[uorb_index].update(&report)) {
-			if (PX4_ISFINITE(report.temperature)) {
-				// Update the offsets and mark for publication if they've changed
-				if (_temperature_compensation.update_offsets_accel(uorb_index, report.temperature, offsets[uorb_index]) == 2) {
+		if (_vehicle_imu_status_subs[uorb_index].update(&imu_status)) {
+			if ((imu_status.accel_device_id != 0) && PX4_ISFINITE(imu_status.temperature_accel)) {
 
-					_corrections.accel_device_ids[uorb_index] = report.device_id;
+				float *offsets[] = {_corrections.accel_offset_0, _corrections.accel_offset_1, _corrections.accel_offset_2, _corrections.accel_offset_3 };
+
+				// Update the offsets and mark for publication if they've changed
+				if (_temperature_compensation.update_offsets_accel(uorb_index, imu_status.temperature_accel,
+						offsets[uorb_index]) == 2) {
+
+					_corrections.accel_device_ids[uorb_index] = imu_status.accel_device_id;
 					_corrections_changed = true;
 				}
 			}
-		}
-	}
-}
 
-void TemperatureCompensationModule::gyroPoll()
-{
-	float *offsets[] = {_corrections.gyro_offset_0, _corrections.gyro_offset_1, _corrections.gyro_offset_2, _corrections.gyro_offset_3 };
 
-	// For each gyro instance
-	for (uint8_t uorb_index = 0; uorb_index < GYRO_COUNT_MAX; uorb_index++) {
-		sensor_gyro_s report;
+			if ((imu_status.gyro_device_id != 0) && PX4_ISFINITE(imu_status.temperature_gyro)) {
 
-		// Grab temperature from report
-		if (_gyro_subs[uorb_index].update(&report)) {
-			if (PX4_ISFINITE(report.temperature)) {
+				float *offsets[] = {_corrections.gyro_offset_0, _corrections.gyro_offset_1, _corrections.gyro_offset_2, _corrections.gyro_offset_3 };
+
 				// Update the offsets and mark for publication if they've changed
-				if (_temperature_compensation.update_offsets_gyro(uorb_index, report.temperature, offsets[uorb_index]) == 2) {
+				if (_temperature_compensation.update_offsets_gyro(uorb_index, imu_status.temperature_gyro, offsets[uorb_index]) == 2) {
 
-					_corrections.gyro_device_ids[uorb_index] = report.device_id;
+					_corrections.gyro_device_ids[uorb_index] = imu_status.gyro_device_id;
 					_corrections_changed = true;
 				}
 			}
@@ -241,8 +226,7 @@ void TemperatureCompensationModule::Run()
 		parameters_update();
 	}
 
-	accelPoll();
-	gyroPoll();
+	imuPoll();
 	baroPoll();
 
 	// publish sensor corrections if necessary

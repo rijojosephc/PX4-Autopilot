@@ -44,15 +44,13 @@ ICM20602::ICM20602(I2CSPIBusOption bus_option, int bus, uint32_t device, enum Ro
 		   spi_mode_e spi_mode, spi_drdy_gpio_t drdy_gpio) :
 	SPI(DRV_IMU_DEVTYPE_ICM20602, MODULE_NAME, bus, device, spi_mode, bus_frequency),
 	I2CSPIDriver(MODULE_NAME, px4::device_bus_to_wq(get_device_id()), bus_option, bus),
-	_drdy_gpio(drdy_gpio),
-	_px4_accel(get_device_id(), rotation),
-	_px4_gyro(get_device_id(), rotation)
+	_drdy_gpio(drdy_gpio)
 {
 	if (drdy_gpio != 0) {
 		_drdy_missed_perf = perf_alloc(PC_COUNT, MODULE_NAME": DRDY missed");
 	}
 
-	ConfigureSampleRate(_px4_gyro.get_max_rate_hz());
+	ConfigureSampleRate(400); // TODO
 }
 
 ICM20602::~ICM20602()
@@ -284,23 +282,19 @@ void ICM20602::ConfigureAccel()
 
 	switch (ACCEL_FS_SEL) {
 	case ACCEL_FS_SEL_2G:
-		_px4_accel.set_scale(CONSTANTS_ONE_G / 16384.f);
-		_px4_accel.set_range(2.f * CONSTANTS_ONE_G);
+		_accel_scale = CONSTANTS_ONE_G / 16384.f;
 		break;
 
 	case ACCEL_FS_SEL_4G:
-		_px4_accel.set_scale(CONSTANTS_ONE_G / 8192.f);
-		_px4_accel.set_range(4.f * CONSTANTS_ONE_G);
+		_accel_scale = CONSTANTS_ONE_G / 8192.f;
 		break;
 
 	case ACCEL_FS_SEL_8G:
-		_px4_accel.set_scale(CONSTANTS_ONE_G / 4096.f);
-		_px4_accel.set_range(8.f * CONSTANTS_ONE_G);
+		_accel_scale = CONSTANTS_ONE_G / 4096.f;
 		break;
 
 	case ACCEL_FS_SEL_16G:
-		_px4_accel.set_scale(CONSTANTS_ONE_G / 2048.f);
-		_px4_accel.set_range(16.f * CONSTANTS_ONE_G);
+		_accel_scale = CONSTANTS_ONE_G / 2048.f;
 		break;
 	}
 }
@@ -329,8 +323,7 @@ void ICM20602::ConfigureGyro()
 		break;
 	}
 
-	_px4_gyro.set_scale(math::radians(range_dps / 32768.f));
-	_px4_gyro.set_range(math::radians(range_dps));
+	_gyro_scale = math::radians(range_dps / 32768.f);
 }
 
 void ICM20602::ConfigureSampleRate(int sample_rate)
@@ -557,6 +550,11 @@ bool ICM20602::ProcessAccel(const hrt_abstime &timestamp_sample, const FIFO::DAT
 {
 	sensor_accel_fifo_s accel{};
 	accel.timestamp_sample = timestamp_sample;
+	accel.device_id = get_device_id();
+	accel.temperature = _last_temperature;
+	accel.error_count = perf_event_count(_bad_register_perf) + perf_event_count(_bad_transfer_perf) + perf_event_count(
+				    _fifo_empty_perf) + perf_event_count(_fifo_overflow_perf);
+	accel.scale = _accel_scale;
 	accel.samples = 0;
 	accel.dt = FIFO_SAMPLE_DT * SAMPLES_PER_TRANSFER;
 
@@ -596,11 +594,10 @@ bool ICM20602::ProcessAccel(const hrt_abstime &timestamp_sample, const FIFO::DAT
 		accel.samples++;
 	}
 
-	_px4_accel.set_error_count(perf_event_count(_bad_register_perf) + perf_event_count(_bad_transfer_perf) +
-				   perf_event_count(_fifo_empty_perf) + perf_event_count(_fifo_overflow_perf));
-
+	// publish
 	if (accel.samples > 0) {
-		_px4_accel.updateFIFO(accel);
+		accel.timestamp = hrt_absolute_time();
+		_sensor_accel_fifo_pub.publish(accel);
 	}
 
 	return !bad_data;
@@ -610,6 +607,11 @@ void ICM20602::ProcessGyro(const hrt_abstime &timestamp_sample, const FIFO::DATA
 {
 	sensor_gyro_fifo_s gyro{};
 	gyro.timestamp_sample = timestamp_sample;
+	gyro.device_id = get_device_id();
+	gyro.temperature = _last_temperature;
+	gyro.error_count = perf_event_count(_bad_register_perf) + perf_event_count(_bad_transfer_perf) + perf_event_count(
+				   _fifo_empty_perf) + perf_event_count(_fifo_overflow_perf);
+	gyro.scale = _gyro_scale;
 	gyro.samples = samples;
 	gyro.dt = FIFO_SAMPLE_DT;
 
@@ -625,10 +627,9 @@ void ICM20602::ProcessGyro(const hrt_abstime &timestamp_sample, const FIFO::DATA
 		gyro.z[i] = (gyro_z == INT16_MIN) ? INT16_MAX : -gyro_z;
 	}
 
-	_px4_gyro.set_error_count(perf_event_count(_bad_register_perf) + perf_event_count(_bad_transfer_perf) +
-				  perf_event_count(_fifo_empty_perf) + perf_event_count(_fifo_overflow_perf));
-
-	_px4_gyro.updateFIFO(gyro);
+	// publish
+	gyro.timestamp = hrt_absolute_time();
+	_sensor_gyro_fifo_pub.publish(gyro);
 }
 
 bool ICM20602::ProcessTemperature(const FIFO::DATA fifo[], const uint8_t samples)
@@ -659,8 +660,7 @@ bool ICM20602::ProcessTemperature(const FIFO::DATA fifo[], const uint8_t samples
 	    && (temperature_C >= TEMPERATURE_SENSOR_MIN)
 	    && (temperature_C <= TEMPERATURE_SENSOR_MAX)) {
 
-		_px4_accel.set_temperature(temperature_C);
-		_px4_gyro.set_temperature(temperature_C);
+		_last_temperature = temperature_C;
 		return true;
 
 	} else {

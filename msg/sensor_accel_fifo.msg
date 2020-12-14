@@ -8,8 +8,14 @@ float32 scale
 
 uint8 samples             # number of valid samples
 
-int16[32] x               # acceleration in the NED X board axis in m/s/s
-int16[32] y               # acceleration in the NED Y board axis in m/s/s
-int16[32] z               # acceleration in the NED Z board axis in m/s/s
+int16[32] x               # array of raw acceleration in the sensor X axis
+int16[32] y               # array of raw acceleration in the sensor Y axis
+int16[32] z               # array of raw acceleration in the sensor Z axis
 
 uint8 rotation            # Direction the sensor faces (see Rotation enum)
+
+float32 temperature       # temperature in degrees celsius
+
+uint32 error_count
+
+uint8 ORB_QUEUE_LENGTH = 8

@@ -48,7 +48,7 @@
 #include <px4_platform_common/px4_work_queue/ScheduledWorkItem.hpp>
 #include <uORB/Subscription.hpp>
 #include <uORB/topics/parameter_update.h>
-#include <uORB/topics/sensor_accel.h>
+#include <uORB/topics/vehicle_imu_status.h>
 
 #include <mathlib/mathlib.h>
 
@@ -178,8 +178,8 @@ private:
 
 	float _proportional_value = 0.0f;
 
-	uORB::Subscription _sensor_accel_sub{ORB_ID(sensor_accel)};
-	sensor_accel_s _sensor_accel{};
+	uORB::Subscription _vehicle_imu_status_sub{ORB_ID(vehicle_imu_status)};
+	vehicle_imu_status_s _vehicle_imu_status{};
 
 	float _sensor_temperature = 0.0f;
 

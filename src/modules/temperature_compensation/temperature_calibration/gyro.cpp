@@ -48,10 +48,6 @@ TemperatureCalibrationGyro::TemperatureCalibrationGyro(float min_temperature_ris
 		float max_start_temperature, int gyro_subs[], int num_gyros)
 	: TemperatureCalibrationCommon(min_temperature_rise, min_start_temperature, max_start_temperature)
 {
-	for (int i = 0; i < num_gyros; ++i) {
-		_sensor_subs[i] = gyro_subs[i];
-	}
-
 	_num_sensor_instances = num_gyros;
 }
 

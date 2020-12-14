@@ -58,7 +58,7 @@ int TemperatureCompensation::initialize_parameter_handles(ParameterHandles &para
 	ret = param_get(parameter_handles.gyro_tc_enable, &gyro_tc_enabled);
 
 	if (ret == PX4_OK && gyro_tc_enabled) {
-		for (unsigned j = 0; j < GYRO_COUNT_MAX; j++) {
+		for (unsigned j = 0; j < IMU_COUNT_MAX; j++) {
 			sprintf(nbuf, "TC_G%d_ID", j);
 			parameter_handles.gyro_cal_handles[j].ID = param_find(nbuf);
 
@@ -88,7 +88,7 @@ int TemperatureCompensation::initialize_parameter_handles(ParameterHandles &para
 	ret = param_get(parameter_handles.accel_tc_enable, &accel_tc_enabled);
 
 	if (ret == PX4_OK && accel_tc_enabled) {
-		for (unsigned j = 0; j < ACCEL_COUNT_MAX; j++) {
+		for (unsigned j = 0; j < IMU_COUNT_MAX; j++) {
 			sprintf(nbuf, "TC_A%d_ID", j);
 			parameter_handles.accel_cal_handles[j].ID = param_find(nbuf);
 
@@ -158,7 +158,7 @@ int TemperatureCompensation::parameters_update()
 	param_get(parameter_handles.gyro_tc_enable, &_parameters.gyro_tc_enable);
 
 	if (_parameters.gyro_tc_enable == 1) {
-		for (unsigned j = 0; j < GYRO_COUNT_MAX; j++) {
+		for (unsigned j = 0; j < IMU_COUNT_MAX; j++) {
 			if (param_get(parameter_handles.gyro_cal_handles[j].ID, &(_parameters.gyro_cal_data[j].ID)) == PX4_OK) {
 				param_get(parameter_handles.gyro_cal_handles[j].ref_temp, &(_parameters.gyro_cal_data[j].ref_temp));
 				param_get(parameter_handles.gyro_cal_handles[j].min_temp, &(_parameters.gyro_cal_data[j].min_temp));
@@ -185,7 +185,7 @@ int TemperatureCompensation::parameters_update()
 	param_get(parameter_handles.accel_tc_enable, &_parameters.accel_tc_enable);
 
 	if (_parameters.accel_tc_enable == 1) {
-		for (unsigned j = 0; j < ACCEL_COUNT_MAX; j++) {
+		for (unsigned j = 0; j < IMU_COUNT_MAX; j++) {
 			if (param_get(parameter_handles.accel_cal_handles[j].ID, &(_parameters.accel_cal_data[j].ID)) == PX4_OK) {
 				param_get(parameter_handles.accel_cal_handles[j].ref_temp, &(_parameters.accel_cal_data[j].ref_temp));
 				param_get(parameter_handles.accel_cal_handles[j].min_temp, &(_parameters.accel_cal_data[j].min_temp));
@@ -317,7 +317,7 @@ int TemperatureCompensation::set_sensor_id_gyro(uint32_t device_id, int topic_in
 		return 0;
 	}
 
-	return set_sensor_id(device_id, topic_instance, _gyro_data, _parameters.gyro_cal_data, GYRO_COUNT_MAX);
+	return set_sensor_id(device_id, topic_instance, _gyro_data, _parameters.gyro_cal_data, IMU_COUNT_MAX);
 }
 
 int TemperatureCompensation::set_sensor_id_accel(uint32_t device_id, int topic_instance)
@@ -326,7 +326,7 @@ int TemperatureCompensation::set_sensor_id_accel(uint32_t device_id, int topic_i
 		return 0;
 	}
 
-	return set_sensor_id(device_id, topic_instance, _accel_data, _parameters.accel_cal_data, ACCEL_COUNT_MAX);
+	return set_sensor_id(device_id, topic_instance, _accel_data, _parameters.accel_cal_data, IMU_COUNT_MAX);
 }
 
 int TemperatureCompensation::set_sensor_id_baro(uint32_t device_id, int topic_instance)
@@ -436,7 +436,7 @@ void TemperatureCompensation::print_status()
 	PX4_INFO(" gyro: enabled: %i", _parameters.gyro_tc_enable);
 
 	if (_parameters.gyro_tc_enable == 1) {
-		for (int i = 0; i < GYRO_COUNT_MAX; ++i) {
+		for (int i = 0; i < IMU_COUNT_MAX; ++i) {
 			uint8_t mapping = _gyro_data.device_mapping[i];
 
 			if (_gyro_data.device_mapping[i] != 255) {
@@ -448,7 +448,7 @@ void TemperatureCompensation::print_status()
 	PX4_INFO(" accel: enabled: %i", _parameters.accel_tc_enable);
 
 	if (_parameters.accel_tc_enable == 1) {
-		for (int i = 0; i < ACCEL_COUNT_MAX; ++i) {
+		for (int i = 0; i < IMU_COUNT_MAX; ++i) {
 			uint8_t mapping = _accel_data.device_mapping[i];
 
 			if (_accel_data.device_mapping[i] != 255) {

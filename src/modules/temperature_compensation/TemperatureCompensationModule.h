@@ -48,6 +48,7 @@
 #include <px4_platform_common/time.h>
 #include <uORB/Publication.hpp>
 #include <uORB/Subscription.hpp>
+#include <uORB/SubscriptionMultiArray.hpp>
 #include <uORB/topics/parameter_update.h>
 #include <uORB/topics/sensor_accel.h>
 #include <uORB/topics/sensor_baro.h>
@@ -55,6 +56,7 @@
 #include <uORB/topics/sensor_gyro.h>
 #include <uORB/topics/vehicle_command.h>
 #include <uORB/topics/vehicle_command_ack.h>
+#include <uORB/topics/vehicle_imu_status.h>
 
 #include "TemperatureCompensation.h"
 
@@ -92,8 +94,7 @@ private:
 
 	void Run() override;
 
-	void accelPoll();
-	void gyroPoll();
+	void imuPoll();
 	void baroPoll();
 
 	/**
@@ -102,19 +103,7 @@ private:
 	 */
 	void parameters_update();
 
-	uORB::Subscription _accel_subs[ACCEL_COUNT_MAX] {
-		{ORB_ID(sensor_accel), 0},
-		{ORB_ID(sensor_accel), 1},
-		{ORB_ID(sensor_accel), 2},
-		{ORB_ID(sensor_accel), 3},
-	};
-
-	uORB::Subscription _gyro_subs[GYRO_COUNT_MAX] {
-		{ORB_ID(sensor_gyro), 0},
-		{ORB_ID(sensor_gyro), 1},
-		{ORB_ID(sensor_gyro), 2},
-		{ORB_ID(sensor_gyro), 3},
-	};
+	uORB::SubscriptionMultiArray<vehicle_imu_status_s, IMU_COUNT_MAX> _vehicle_imu_status_subs{ORB_ID::vehicle_imu_status};
 
 	uORB::Subscription _baro_subs[BARO_COUNT_MAX] {
 		{ORB_ID(sensor_baro), 0},

@@ -47,6 +47,7 @@ using namespace time_literals;
 bool PreFlightCheck::accelerometerCheck(orb_advert_t *mavlink_log_pub, vehicle_status_s &status, const uint8_t instance,
 					const bool optional, int32_t &device_id, const bool report_fail)
 {
+	// TODO: sensor_accel & sensor_accel_fifo
 	const bool exists = (orb_exists(ORB_ID(sensor_accel), instance) == PX4_OK);
 	bool calibration_valid = false;
 	bool valid = true;

@@ -54,25 +54,34 @@ public:
 	/**
 	 * Put an item into the integral.
 	 *
-	 * @param timestamp	Timestamp of the current value.
+	 * @param dt     	Delta time for current value
 	 * @param val		Item to put.
 	 * @return		true if data was accepted and integrated.
 	 */
-	bool put(const uint64_t &timestamp, const matrix::Vector3f &val);
-
-	/**
-	 * Put an item into the integral.
-	 *
-	 * @param timestamp	Timestamp of the current value.
-	 * @param val		Item to put.
-	 * @param integral	Current integral in case the integrator did reset, else the value will not be modified
-	 * @param integral_dt	Get the dt in us of the current integration (only if reset).
-	 * @return		true if putting the item triggered an integral reset and the integral should be
-	 *			published.
-	 */
-	bool put(const uint64_t &timestamp, const matrix::Vector3f &val, matrix::Vector3f &integral, uint32_t &integral_dt)
+	bool put(const float dt, const matrix::Vector3f &val)
 	{
-		return put(timestamp, val) && reset(integral, integral_dt);
+		// Use trapezoidal integration to calculate the delta integral
+		const matrix::Vector3f delta_alpha{(val + _last_val) *dt * 0.5f};
+		_last_val = val;
+		_integral_dt_s += dt;
+		_integrated_samples++;
+
+		// Calculate coning corrections if required
+		if (_coning_comp_on) {
+			// Coning compensation derived by Paul Riseborough and Jonathan Challinger,
+			// following:
+			// Tian et al (2010) Three-loop Integration of GPS and Strapdown INS with Coning and Sculling Compensation
+			// Sourced: http://www.sage.unsw.edu.au/snap/publications/tian_etal2010b.pdf
+			// Simulated: https://github.com/priseborough/InertialNav/blob/master/models/imu_error_modelling.m
+			_beta += ((_last_alpha + _last_delta_alpha * (1.f / 6.f)) % delta_alpha) * 0.5f;
+			_last_delta_alpha = delta_alpha;
+			_last_alpha = _alpha;
+		}
+
+		// accumulate delta integrals
+		_alpha += delta_alpha;
+
+		return true;
 	}
 
 	/**
@@ -88,31 +97,52 @@ public:
 	 * @param reset_samples	    	New reset time interval for the integrator.
 	 */
 	void set_reset_samples(uint8_t reset_samples) { _reset_samples_min = reset_samples; }
-	uint8_t get_reset_samples() const { return _reset_samples_min; }
+	uint8_t reset_samples() const { return _reset_samples_min; }
 
 	/**
 	 * Is the Integrator ready to reset?
 	 *
 	 * @return		true if integrator has sufficient data (minimum interval & samples satisfied) to reset.
 	 */
-	bool integral_ready() const { return (_integrated_samples >= _reset_samples_min) || (_last_integration_time >= (_last_reset_time + _reset_interval_min)); }
+	bool integral_ready() const { return (_integrated_samples >= _reset_samples_min) || (_integral_dt_s >= (_reset_interval_min / 1e6f)); }
 
 	/* Reset integrator and return current integral & integration time
 	 *
 	 * @param integral_dt	Get the dt in us of the current integration.
 	 * @return		true if integral valid
 	 */
-	bool reset(matrix::Vector3f &integral, uint32_t &integral_dt);
+	bool reset(matrix::Vector3f &integral, uint32_t &integral_dt)
+	{
+		if (integral_ready()) {
+			integral = _alpha;
+			integral_dt = roundf(_integral_dt_s * 1e6f); // seconds -> microseconds
+
+			// reset
+			_alpha.zero();
+			_integral_dt_s = 0;
+			_integrated_samples = 0;
+
+			// apply coning corrections if required
+			if (_coning_comp_on) {
+				integral += _beta;
+				_beta.zero();
+				//_last_alpha.zero(); // TODO: review?
+			}
+
+			return true;
+		}
+
+		return false;
+	}
 
 private:
-	uint64_t _last_integration_time{0}; /**< timestamp of the last integration step */
-	uint64_t _last_reset_time{0};       /**< last auto-announcement of integral value */
-
 	matrix::Vector3f _alpha{0.f, 0.f, 0.f};            /**< integrated value before coning corrections are applied */
 	matrix::Vector3f _last_alpha{0.f, 0.f, 0.f};       /**< previous value of _alpha */
 	matrix::Vector3f _beta{0.f, 0.f, 0.f};             /**< accumulated coning corrections */
 	matrix::Vector3f _last_val{0.f, 0.f, 0.f};         /**< previous input */
 	matrix::Vector3f _last_delta_alpha{0.f, 0.f, 0.f}; /**< integral from previous previous sampling interval */
+
+	float _integral_dt_s{0};
 
 	uint32_t _reset_interval_min{1}; /**< the interval after which the content will be published and the integrator reset */
 
