@@ -132,7 +132,7 @@ void task_main(int argc, char *argv[])
 		int8_t dsm_rssi;
 
 		// parse new data
-		bool rc_updated = dsm_parse(now, rx_buf, newbytes, &raw_rc_values[0], &raw_rc_count,
+		bool rc_updated = dsm_parse(rx_buf, newbytes, &raw_rc_values[0], &raw_rc_count,
 					    &dsm_11_bit, &frame_drops, &dsm_rssi, input_rc_s::RC_INPUT_MAX_CHANNELS);
 		UNUSED(dsm_11_bit);
 

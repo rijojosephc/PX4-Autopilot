@@ -421,10 +421,10 @@ void RCInput::Run()
 				   || cycle_timestamp - _rc_scan_begin < rc_scan_max) {
 
 				if (newBytes > 0) {
-					int8_t dsm_rssi;
+					int8_t dsm_rssi = 0;
 
 					// parse new data
-					rc_updated = dsm_parse(cycle_timestamp, &_rcs_buf[0], newBytes, &_raw_rc_values[0], &_raw_rc_count,
+					rc_updated = dsm_parse(&_rcs_buf[0], newBytes, &_raw_rc_values[0], &_raw_rc_count,
 							       &dsm_11_bit, &frame_drops, &dsm_rssi, input_rc_s::RC_INPUT_MAX_CHANNELS);
 
 					if (rc_updated) {
